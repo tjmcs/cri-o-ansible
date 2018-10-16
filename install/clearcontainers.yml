@@ -27,8 +27,7 @@
 
   - name: Install Clear Containers (Fedora)
     dnf:
-      name: "{{ item }}"
-    with_items:
-      - cc-oci-runtime
-      - linux-container
+      name:
+        - cc-oci-runtime
+        - linux-container
   when: ansible_distribution == 'Fedora'

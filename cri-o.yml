@@ -1,5 +1,7 @@
 ---
-- hosts: all
+#- hosts: all
+- hosts: 127.0.0.1
+  connection: local
   become: true
   tasks:
     - include: install/os_updates.yml
@@ -10,84 +12,101 @@
 
     - name: Make sure we have all required packages on Fedora
       dnf:
-        name: "{{ item }}"
         state: latest
-      with_items:
-        - btrfs-progs-devel
-        - container-selinux
-        - device-mapper-devel
-        - gcc
-        - git
-        - glib2-devel
-        - glibc-devel
-        - glibc-static
-        - go-md2man
-        - golang
-        - gpgme-devel
-        - iptables
-        - libassuan-devel
-        - libgpg-error-devel
-        - libseccomp-devel
-        - make
-        - pkgconfig
-        - skopeo-containers
-        - tar
-        - wget
+        name:
+          - btrfs-progs-devel
+          #- container-selinux
+          - device-mapper-devel
+          #- gcc
+          - git
+          - glib2-devel
+          - glibc-devel
+          - glibc-static
+          #- go
+          #- go-md2man
+          - golang-github-cpuguy83-go-md2man
+          #- golang
+          - gpgme-devel
+          #- iptables
+          - libassuan-devel
+          - libgpg-error-devel
+          - libseccomp-devel
+          - libselinux-devel
+          #- make
+          - ostree-devel
+          - pkgconfig
+          - runc
+          - skopeo-containers
+          #- tar
+          #- wget
       when: ansible_distribution == 'Fedora'
 
     - name: Make sure we have all required packages on RHEL/CentOS
       yum:
-        name: "{{ item }}"
         state: latest
-      with_items:
-        - btrfs-progs-devel
-        - container-selinux
-        - device-mapper-devel
-        - gcc
-        - git
-        - glib2-devel
-        - glibc-devel
-        - glibc-static
-        - go-md2man
-        - golang
-        - gpgme-devel
-        - json-glib-devel
-        - libassuan-devel
-        - libgpg-error-devel
-        - libseccomp-devel
-        - make
-        - pkgconfig
-        - skopeo-containers
-        - tar
-        - wget
+        name:
+          - btrfs-progs-devel
+          #- container-selinux
+          - device-mapper-devel
+          #- gcc
+          - git
+          - glib2-devel
+          - glibc-devel
+          - glibc-static
+          #- go
+          #- go-md2man
+          - golang-github-cpuguy83-go-md2man
+          #- golang
+          - gpgme-devel
+          #- json-glib-devel
+          - libassuan-devel
+          - libgpg-error-devel
+          - libseccomp-devel
+          - libselinux-devel
+          #- make
+          - ostree-devel
+          - pkgconfig
+          - runc
+          - skopeo-containers
+          #- tar
+          #- wget
       when: ansible_distribution in ['RedHat', 'CentOS']
 
     - name: Make sure we have all required packages on Ubuntu
       package:
-        name: "{{ item }}"
         state: latest
-      with_items:
-        - apt-transport-https
-        - aptitude
-        - btrfs-tools
-        - build-essential
-        - curl
-        - gawk
-        - iptables
-        - libaio-dev
-        - libapparmor-dev
-        - libcap-dev
-        - libdevmapper-dev
-        - libdevmapper1.02.1
-        - libglib2.0-dev
-        - libgpgme11-dev
-        - libjson-glib-dev
-        - libprotobuf-dev
-        - libseccomp-dev
-        - libseccomp2
-        - pkg-config
-        - protobuf-compiler
-        - python-minimal
+        name:
+          #- apt-transport-https
+          #- aptitude
+          - btrfs-tools
+          #- build-essential
+          #- curl
+          #- gawk
+          - git
+          #- golang-go
+          #- iptables
+          #- libaio-dev
+          #- libapparmor-dev
+          - libassuan-dev
+          #- libcap-dev
+          - libdevmapper-dev
+          #- libdevmapper1.02.1
+          - libglib2.0-dev
+          - libc6-dev
+          - libglib2.0-dev
+          - libgpgme11-dev
+          - libgpg-error-dev
+          #- libjson-glib-dev
+          #- libprotobuf-dev
+          - libseccomp-dev
+          #- libseccomp2
+          - libselinux1-dev
+          - pkg-config
+          #- protobuf-compiler
+          #- python-minimal
+          - go-md2man
+          - runc
+          - skopeo-containers
       when: ansible_distribution == 'Ubuntu'
 
     - name: Make directories
@@ -108,9 +127,8 @@
 
     - name: clone CRI-O
       git:
-        repo: https://github.com/kubernetes-incubator/cri-o
-        dest: /root/src/github.com/kubernetes-incubator/cri-o
-        version: kube-1.6.x
+        repo: https://github.com/kubernetes-sigs/cri-o
+        dest: /root/src/github.com/kubernetes-sigs/cri-o
 
     - name: clone CNI
       git:
@@ -129,7 +147,7 @@
 
     - name: build cri-o
       shell: |
-              cd /root/src/github.com/kubernetes-incubator/cri-o && \
+              cd /root/src/github.com/kubernetes-sigs/cri-o && \
               make install.tools && \
               make && \
               make install && \
@@ -157,20 +175,19 @@
         backup: yes
       when: ansible_distribution in ['Fedora', 'RedHat', 'CentOS']
 
-    - name: run with overlay2
+    - name: run with overlay
       replace:
-        regexp: 'storage_driver = ""'
-        replace: 'storage_driver = "overlay2"'
+        regexp: '(.*)(storage_driver[\s]*=[\s]*").*(")'
+        replace: '\2overlay\3'
         name: /etc/crio/crio.conf
         backup: yes
 
-    - name: add overlay2 storage opts on RHEL/CentOS
-      lineinfile:
+    - name: add overlay storage opts on RHEL/CentOS
+      replace:
+        regexp: '(.*)(storage_option.*)\n([\#]?)([\s]+\")[^\"]*(\",)\n([\#]?)(\])'
+        replace: '\2\n\4overlay.override_kernel_check=true\5\n\7'
         dest: /etc/crio/crio.conf
-        line: '"overlay2.override_kernel_check=1"'
-        insertafter: 'storage_option = \['
-        regexp: 'overlay2\.override_kernel_check=1'
-        state: present
+        backup: yes
       when: ansible_distribution in ['RedHat', 'CentOS']
 
     - block:
